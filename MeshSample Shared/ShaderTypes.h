@@ -58,7 +58,6 @@ typedef NS_ENUM(NSInteger, QualityLevel)
 	QualityLevelHigh   = 0,
 	QualityLevelMedium = 1,
 	QualityLevelLow    = 2,
-	NumQualityLevels
 };
 
 typedef NS_ENUM(NSInteger, FunctionConstant)

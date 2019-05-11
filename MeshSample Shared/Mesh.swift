@@ -16,7 +16,15 @@ class Submesh: NSObject {
 	// Sets the weight of values sampled from a texture vs a material uniform for a transition
 	//   between levels.
 	func computeTextureWeightsForQualityLevel(quality: QualityLevel, withGlobalMapWeight globalWeight: Float) {
-		
+		for textureIndex in 0 ..< TextureIndex.numMeshTextureIndices.rawValue {
+			let constantIndex = Submesh.mapTextureBindPointToFunctionConstantIndex(textureIndex: TextureIndex(rawValue: textureIndex)!)
+			
+			if Mesh.isTexturedProperty(propertyIndex: constantIndex, atQualityLevel: quality) {
+				uniforms.pointee.mapWeights.0 = globalWeight
+			} else {
+				uniforms.pointee.mapWeights.0 = 1.0
+			}
+		}
 	}
 	
 	// MARK: Properties
@@ -134,30 +142,140 @@ class Submesh: NSObject {
 		}
 		return texture
 	}
+	
+	static private func mapTextureBindPointToFunctionConstantIndex(textureIndex: TextureIndex) -> FunctionConstant {
+		switch (textureIndex) {
+		case .baseColor:
+			return .baseColorMapIndex
+		case .normal:
+			return .normalMapIndex
+		case .metallic:
+			return .metallicMapIndex
+		case .ambientOcclusion:
+			return .ambientOcclusionMapIndex
+		case .roughness:
+			return .roughnessMapIndex
+		default: assert(false)
+		}
+	}
 }
 
 // MARK: - App specific mesh class containing vertex data describing the mesh and submesh object describing how to draw parts of the mesh
 class Mesh: NSObject {
 	
-	// Constructs an array of meshes from the provided file URL, which indicate the location of a model
-	//  file in a format supported by Model I/O, such as OBJ, ABC, or USD.  the Model I/O vertex
-	//  descriptor defines the layout Model I/O will use to arrange the vertex data while the
-	//  bufferAllocator supplies allocations of Metal buffers to store vertex and index data
-	func newMeshesFromURL(url: NSURL, modelIOVertexDescriptor vertexDescriptor: MDLVertexDescriptor, metalDevice device: MTLDevice, error: NSError) -> [Mesh] {
-		return []
-	}
-	
-	func isTexturedProperty(propertyIndex: FunctionConstant, atQualityLevel quality: QualityLevel) -> Bool {
-		return false
-	}
-	
 	// A MetalKit mesh containing vertex buffers describing the shape of the mesh
-	var metalKitMesh: MTKMesh?
+	var metalKitMesh: MTKMesh
 	
 	// An array of Submesh objects containing buffers and data with which we can make a draw call
 	//  and material data to set in a Metal render command encoder for that draw call
-	var submeshes: [Submesh] = []
+	var submeshes: [Submesh?]
+	
+	/// Load the Model I/O mesh, including vertex data and submesh data which have index buffers and
+	///   textures.  Also generate tangent and bitangent vertex attributes
+	init?(modelIOMesh: MDLMesh, modelIOVertexDescriptor vertexDescriptor: MDLVertexDescriptor, metalKitTextureLoader textureLoader: MTKTextureLoader, metalDevice device: MTLDevice) {
+		
+		modelIOMesh.addNormals(withAttributeNamed: MDLVertexAttributeNormal, creaseThreshold: 0.2)
+		
+		// Have Model I/O create the tangents from mesh texture coordinates and normals
+		modelIOMesh.addTangentBasis(forTextureCoordinateAttributeNamed: MDLVertexAttributeTextureCoordinate, normalAttributeNamed: MDLVertexAttributeNormal, tangentAttributeNamed: MDLVertexAttributeTangent)
+		
+		// Have Model I/O create bitangents from mesh texture coordinates and the newly created tangents
+		modelIOMesh.addTangentBasis(forTextureCoordinateAttributeNamed: MDLVertexAttributeTextureCoordinate, tangentAttributeNamed: MDLVertexAttributeTangent, bitangentAttributeNamed: MDLVertexAttributeBitangent)
+		
+		// Apply the Model I/O vertex descriptor we created to match the Metal vertex descriptor.
+		// Assigning a new vertex descriptor to a Model I/O mesh performs a re-layout of the vertex data.
+		// In this case we created the Model I/O vertex descriptor so that the layout of the vertices in the Model I/O mesh match the layout of vertices our Metal render pipeline expects as input into its vertex shader
+		// Note that we can only perform this re-layout operation after we have created tangents and bitangents (as we did above).
+		// This is because Model I/O's addTangentBasis methods only work with vertex data is all in 32-bit floating-point.
+		// The vertex descriptor we're applying changes some 32-bit floats into 16-bit floats or other types from which Model I/O cannot produce tangents
+		modelIOMesh.vertexDescriptor = vertexDescriptor;
+		
+		// Create the metalKit mesh which will contain the Metal buffer(s) with the mesh's vertex data and submeshes with info to draw the mesh
+		do {
+			metalKitMesh = try MTKMesh(mesh: modelIOMesh, device: device)
+		} catch {
+			print("Unable to build MetalKit Mesh. Error info: \(error)")
+			return nil
+		}
+		
+		// Create an array to hold this Mesh object's Submesh objects
+		submeshes = [Submesh?].init(repeating: nil, count: metalKitMesh.submeshes.count)
+		
+		// Create an AAPLSubmesh object for each submesh and a add it to our submeshes array
+		for index in 0 ..< metalKitMesh.submeshes.count {
+			// Create our own app specific submesh to hold the MetalKit submesh
+			submeshes.append(Submesh(modelIOSubmesh: modelIOMesh.submeshes![index] as! MDLSubmesh, metalKitSubmesh: metalKitMesh.submeshes[index], metalKitTextureLoader: textureLoader))
+		}
+		
+		super.init()
+	}
+	
+	/// Traverses the Model I/O object hierarchy picking out Model I/O mesh objects and creating Metal vertex buffers, index buffers, and textures from them
+	private func newMeshesFromObject(object: MDLObject, modelIOVertexDescriptor vertexDescriptor: MDLVertexDescriptor, metalKitTextureLoader textureLoader: MTKTextureLoader, metalDevice device: MTLDevice) -> [Mesh] {
+		
+		var newMeshes = [Mesh]()
+		
+		// If this Model I/O  object is a mesh object (not a camera, light, or something else)
+		if let mesh = object as? MDLMesh {
+			newMeshes.append(Mesh(modelIOMesh: mesh, modelIOVertexDescriptor: vertexDescriptor, metalKitTextureLoader: textureLoader, metalDevice: device)!)
+		}
+		
+		// Recursively traverse the Model I/O asset hierarchy to find Model I/O meshes that are children of this Model I/O  object and create app-specific Mesh objects from those Model I/O meshes
+		for child in object.children.objects {
+			newMeshes.append(contentsOf: newMeshesFromObject(object: child, modelIOVertexDescriptor: vertexDescriptor, metalKitTextureLoader: textureLoader, metalDevice: device))
+		}
+		
+		return newMeshes;
+	}
+	
+	/// Uses Model I/O to load a model file at the given URL, create Model I/O vertex buffers, index buffers and textures, applying the given Model I/O vertex descriptor to re-layout vertex attribute data in the way that our Metal vertex shaders expect
+	/// Constructs an array of meshes from the provided file URL, which indicate the location of a model file in a format supported by Model I/O, such as OBJ, ABC, or USD.
+	/// the Model I/O vertex descriptor defines the layout Model I/O will use to arrange the vertex data while the bufferAllocator supplies allocations of Metal buffers to store vertex and index data
+	func newMeshesFromURL(url: URL, modelIOVertexDescriptor vertexDescriptor: MDLVertexDescriptor, metalDevice device: MTLDevice) -> [Mesh] {
+		
+		// Create a MetalKit mesh buffer allocator so that Model I/O  will load mesh data directly into Metal buffers accessible by the GPU
+		let bufferAllocator = MTKMeshBufferAllocator(device: device)
+		
+		// Use Model I/O to load the model file at the URL.
+		// This returns a Model I/O asset object, which contains a hierarchy of Model I/O objects composing a "scene" described by the model file.
+		// This hierarchy may include lights, cameras, but, most importantly, mesh and submesh data that we'll render with Metal
+		let asset = MDLAsset(url: url, vertexDescriptor: nil, bufferAllocator: bufferAllocator)
+		
+		// Create a MetalKit texture loader to load material textures from files or the asset catalog into Metal textures
+		let textureLoader = MTKTextureLoader(device: device)
+		
+		var newMeshes = [Mesh]()
+		
+		// Traverse the Model I/O asset hierarchy to find Model I/O meshes and create app-specific AAPLMesh objects from those Model I/O meshes
+		for object in asset.childObjects(of: MDLMesh.self)
+		{
+			newMeshes.append(contentsOf: newMeshesFromObject(object: object, modelIOVertexDescriptor: vertexDescriptor, metalKitTextureLoader: textureLoader, metalDevice: device))
+		}
+		
+		return newMeshes
+	}
+	
+	
+	static fileprivate func isTexturedProperty(propertyIndex: FunctionConstant, atQualityLevel quality: QualityLevel) -> Bool {
+		var minLevelForProperty = QualityLevel.high
+		
+		switch(propertyIndex)
+		{
+		case .baseColorMapIndex, .irradianceMapIndex:
+			minLevelForProperty = .medium;
+		default: break
+		}
+		
+		return quality.rawValue <= minLevelForProperty.rawValue
+	}
+	
+	
 }
+
+
+
+
+
 
 
 
