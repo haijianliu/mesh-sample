@@ -25,13 +25,16 @@ typedef NS_ENUM(NSInteger, BufferIndex)
 {
 	BufferIndexMeshPositions = 0,
 	BufferIndexMeshGenerics  = 1,
-	BufferIndexUniforms      = 2
+	BufferIndexUniforms      = 2,
 };
 
 typedef NS_ENUM(NSInteger, VertexAttribute)
 {
 	VertexAttributePosition  = 0,
 	VertexAttributeTexcoord  = 1,
+	VertexAttributeNormal    = 2,
+	VertexAttributeTangent   = 3,
+	VertexAttributeBitangent = 4,
 };
 
 // Texture index values shared between shader and C code to ensure Metal shader texture indices

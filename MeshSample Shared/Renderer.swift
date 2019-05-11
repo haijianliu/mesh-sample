@@ -44,6 +44,8 @@ class Renderer: NSObject, MTKViewDelegate {
 	
 	var mesh: MTKMesh
 	
+	var meshes = [MTKMesh]()
+	
 	init?(metalKitView: MTKView) {
 		self.device = metalKitView.device!
 		guard let queue = self.device.makeCommandQueue() else { return nil }
@@ -93,8 +95,36 @@ class Renderer: NSObject, MTKViewDelegate {
 			return nil
 		}
 		
-		super.init()
+		let modelIOVertexDescriptor = MTKModelIOVertexDescriptorFromMetal(mtlVertexDescriptor)
+		guard let attributes = modelIOVertexDescriptor.attributes as? [MDLVertexAttribute] else { return nil }
+		attributes[VertexAttribute.position.rawValue].name = MDLVertexAttributePosition
+		attributes[VertexAttribute.texcoord.rawValue].name = MDLVertexAttributeTextureCoordinate
+		attributes[VertexAttribute.normal.rawValue].name = MDLVertexAttributeNormal
+		attributes[VertexAttribute.tangent.rawValue].name = MDLVertexAttributeTangent
+		attributes[VertexAttribute.bitangent.rawValue].name = MDLVertexAttributeBitangent
 		
+		let modelFileURL = Bundle.main.url(forResource: "Models/firetruck", withExtension: "obj")
+		let bufferAllocator = MTKMeshBufferAllocator(device: device)
+		let asset = MDLAsset(url: modelFileURL, vertexDescriptor: nil, bufferAllocator: bufferAllocator)
+		
+		for object in asset.childObjects(of: MDLMesh.self) {
+			if let mesh = object as? MDLMesh {
+				mesh.vertexDescriptor = modelIOVertexDescriptor
+
+				var metalKitMesh: MTKMesh
+
+				do {
+					metalKitMesh = try MTKMesh(mesh: mesh, device: device)
+				} catch {
+					print("Unable to build MetalKit Mesh. Error info: \(error)")
+					return nil
+				}
+				
+				meshes.append(metalKitMesh)
+			}
+		}
+		
+		super.init()
 	}
 	
 	class func buildMetalVertexDescriptor() -> MTLVertexDescriptor {
@@ -111,11 +141,23 @@ class Renderer: NSObject, MTKViewDelegate {
 		mtlVertexDescriptor.attributes[VertexAttribute.texcoord.rawValue].offset = 0
 		mtlVertexDescriptor.attributes[VertexAttribute.texcoord.rawValue].bufferIndex = BufferIndex.meshGenerics.rawValue
 		
+		mtlVertexDescriptor.attributes[VertexAttribute.normal.rawValue].format = MTLVertexFormat.half4
+		mtlVertexDescriptor.attributes[VertexAttribute.normal.rawValue].offset = 8
+		mtlVertexDescriptor.attributes[VertexAttribute.normal.rawValue].bufferIndex = BufferIndex.meshGenerics.rawValue
+		
+		mtlVertexDescriptor.attributes[VertexAttribute.tangent.rawValue].format = MTLVertexFormat.half4
+		mtlVertexDescriptor.attributes[VertexAttribute.tangent.rawValue].offset = 16
+		mtlVertexDescriptor.attributes[VertexAttribute.tangent.rawValue].bufferIndex = BufferIndex.meshGenerics.rawValue
+		
+		mtlVertexDescriptor.attributes[VertexAttribute.bitangent.rawValue].format = MTLVertexFormat.half4
+		mtlVertexDescriptor.attributes[VertexAttribute.bitangent.rawValue].offset = 24
+		mtlVertexDescriptor.attributes[VertexAttribute.bitangent.rawValue].bufferIndex = BufferIndex.meshGenerics.rawValue
+		
 		mtlVertexDescriptor.layouts[BufferIndex.meshPositions.rawValue].stride = 12
 		mtlVertexDescriptor.layouts[BufferIndex.meshPositions.rawValue].stepRate = 1
 		mtlVertexDescriptor.layouts[BufferIndex.meshPositions.rawValue].stepFunction = MTLVertexStepFunction.perVertex
 		
-		mtlVertexDescriptor.layouts[BufferIndex.meshGenerics.rawValue].stride = 8
+		mtlVertexDescriptor.layouts[BufferIndex.meshGenerics.rawValue].stride = 32
 		mtlVertexDescriptor.layouts[BufferIndex.meshGenerics.rawValue].stepRate = 1
 		mtlVertexDescriptor.layouts[BufferIndex.meshGenerics.rawValue].stepFunction = MTLVertexStepFunction.perVertex
 		
@@ -204,9 +246,9 @@ class Renderer: NSObject, MTKViewDelegate {
 		
 		uniforms[0].projectionMatrix = projectionMatrix
 		
-		let rotationAxis = float3(1, 1, 0)
+		let rotationAxis = float3(0, 1, 0)
 		let modelMatrix = matrix4x4_rotation(radians: rotation, axis: rotationAxis)
-		let viewMatrix = matrix4x4_translation(0.0, 0.0, -8.0)
+		let viewMatrix = matrix4x4_translation(0.0, -10.0, -40.0)
 		uniforms[0].modelViewMatrix = simd_mul(viewMatrix, modelMatrix)
 		rotation += 0.01
 	}
@@ -249,28 +291,23 @@ class Renderer: NSObject, MTKViewDelegate {
 				renderEncoder.setVertexBuffer(dynamicUniformBuffer, offset:uniformBufferOffset, index: BufferIndex.uniforms.rawValue)
 				renderEncoder.setFragmentBuffer(dynamicUniformBuffer, offset:uniformBufferOffset, index: BufferIndex.uniforms.rawValue)
 				
-				for (index, element) in mesh.vertexDescriptor.layouts.enumerated() {
-					guard let layout = element as? MDLVertexBufferLayout else {
-						return
-					}
-					
-					if layout.stride != 0 {
-						let buffer = mesh.vertexBuffers[index]
-						renderEncoder.setVertexBuffer(buffer.buffer, offset:buffer.offset, index: index)
-					}
-				}
-				
 				renderEncoder.setFragmentTexture(colorMap, index: TextureIndex.baseColor.rawValue)
 				
-				for submesh in mesh.submeshes {
-					renderEncoder.drawIndexedPrimitives(type: submesh.primitiveType,
-																							indexCount: submesh.indexCount,
-																							indexType: submesh.indexType,
-																							indexBuffer: submesh.indexBuffer.buffer,
-																							indexBufferOffset: submesh.indexBuffer.offset)
+				for mesh in meshes {
+					for (index, element) in mesh.vertexDescriptor.layouts.enumerated() {
+						guard let layout = element as? MDLVertexBufferLayout else { return }
+						
+						if layout.stride != 0 {
+							let buffer = mesh.vertexBuffers[index]
+							renderEncoder.setVertexBuffer(buffer.buffer, offset:buffer.offset, index: index)
+						}
+					}
 					
+					for submesh in mesh.submeshes {
+						renderEncoder.drawIndexedPrimitives(type: submesh.primitiveType, indexCount: submesh.indexCount, indexType: submesh.indexType, indexBuffer: submesh.indexBuffer.buffer, indexBufferOffset: submesh.indexBuffer.offset)
+					}
 				}
-				
+			
 				renderEncoder.popDebugGroup()
 				
 				renderEncoder.endEncoding()
@@ -279,7 +316,7 @@ class Renderer: NSObject, MTKViewDelegate {
 					commandBuffer.present(drawable)
 				}
 			}
-			
+		
 			commandBuffer.commit()
 		}
 	}
