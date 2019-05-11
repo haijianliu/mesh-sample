@@ -8,8 +8,9 @@
 
 import Metal
 import MetalKit
+import Foundation
 
-// App specific submesh class containing data to draw a submesh
+// MARK: - App specific submesh class containing data to draw a submesh
 class Submesh: NSObject {
 	
 	// Sets the weight of values sampled from a texture vs a material uniform for a transition
@@ -18,19 +19,63 @@ class Submesh: NSObject {
 		
 	}
 	
+	// MARK: Properties
+	
 	// A MetalKit submesh mesh containing the primitive type, index buffer, and index count
 	//   used to draw all or part of its parent Mesh object
-	var metalKitSubmmesh: MTKSubmesh?
+	var metalKitSubmmesh: MTKSubmesh
 	
 	// Material textures (indexed by TextureIndex) to set in the Metal Render Command Encoder
 	//  before drawing the submesh.  Used for higher LODs
-	var textures: [MTLTexture] = []
+	var textures: [MTLTexture?]
 	
 	// Material uniforms used instead of texture when rendering with lower LODs
-	var materialUniforms: MTLBuffer?
+	var materialUniforms: MTLBuffer
+	
+	var uniforms: UnsafeMutablePointer<MaterialUniforms>
+	
+	// MARK: Initializer
+	
+	init?(modelIOSubmesh: MDLSubmesh, metalKitSubmesh: MTKSubmesh, metalKitTextureLoader textureLoader: MTKTextureLoader) {
+		metalKitSubmmesh = metalKitSubmesh;
+		
+		// Fill up our texture array with null objects so that we can fill it by indexing into it
+		textures = [MTLTexture?](repeating: nil, count: TextureIndex.numMeshTextureIndices.rawValue)
+		
+		//create the uniform buffer
+		guard let buffer = textureLoader.device.makeBuffer(length: MemoryLayout<MaterialUniforms>.size, options:[]) else { return nil }
+		materialUniforms = buffer
+		
+		materialUniforms.label = "MaterialUniforms"
+		
+		uniforms = UnsafeMutableRawPointer(materialUniforms.contents()).bindMemory(to: MaterialUniforms.self, capacity: 1)
+		
+		// Set default material uniforms
+		uniforms.pointee.baseColor = vector3(0.3, 0.0, 0.0)
+		uniforms.pointee.roughness = vector3(0.2, 0.2, 0.2)
+		uniforms.pointee.metalness = vector3(0.0, 0.0, 0.0)
+		uniforms.pointee.ambientOcclusion = 0.5
+		uniforms.pointee.irradiatedColor = vector3(1.0, 1.0, 1.0)
+		
+		// Set each index in our array with the appropriate material semantic specified in the submesh's material property
+		
+		textures[TextureIndex.baseColor.rawValue] = Submesh.createMetalTextureFromMaterial(material: modelIOSubmesh.material!, modelIOMaterialSemantic: MDLMaterialSemantic.baseColor, modelIOMaterialType: MDLMaterialPropertyType.float3, metalKitTextureLoader: textureLoader)
+		
+		textures[TextureIndex.metallic.rawValue] = Submesh.createMetalTextureFromMaterial(material: modelIOSubmesh.material!, modelIOMaterialSemantic: MDLMaterialSemantic.metallic, modelIOMaterialType: MDLMaterialPropertyType.float3, metalKitTextureLoader: textureLoader)
+		
+		textures[TextureIndex.roughness.rawValue] = Submesh.createMetalTextureFromMaterial(material: modelIOSubmesh.material!, modelIOMaterialSemantic: MDLMaterialSemantic.roughness, modelIOMaterialType: MDLMaterialPropertyType.float3, metalKitTextureLoader: textureLoader)
+		
+		textures[TextureIndex.normal.rawValue] = Submesh.createMetalTextureFromMaterial(material: modelIOSubmesh.material!, modelIOMaterialSemantic: MDLMaterialSemantic.tangentSpaceNormal, modelIOMaterialType: MDLMaterialPropertyType.none, metalKitTextureLoader: textureLoader)
+		
+		textures[TextureIndex.ambientOcclusion.rawValue] = Submesh.createMetalTextureFromMaterial(material: modelIOSubmesh.material!, modelIOMaterialSemantic: MDLMaterialSemantic.ambientOcclusion, modelIOMaterialType: MDLMaterialPropertyType.none, metalKitTextureLoader: textureLoader)
+		
+		super.init()
+	}
+	
+	// MARK: Texture
 	
 	/// Create a metal texture with the given semantic in the given Model I/O material object
-	private func createMetalTextureFromMaterial(material: MDLMaterial, modelIOMaterialSemantic materialSemantic: MDLMaterialSemantic, modelIOMaterialType defaultPropertyType: MDLMaterialPropertyType, metalKitTextureLoader textureLoader: MTKTextureLoader, materialUniform uniform: MaterialUniforms?) -> MTLTexture? {
+	static private func createMetalTextureFromMaterial(material: MDLMaterial, modelIOMaterialSemantic materialSemantic: MDLMaterialSemantic, modelIOMaterialType defaultPropertyType: MDLMaterialPropertyType, metalKitTextureLoader textureLoader: MTKTextureLoader) -> MTLTexture? {
 		
 		var texture: MTLTexture?
 		
@@ -91,8 +136,7 @@ class Submesh: NSObject {
 	}
 }
 
-// App specific mesh class containing vertex data describing the mesh and submesh object describing
-//   how to draw parts of the mesh
+// MARK: - App specific mesh class containing vertex data describing the mesh and submesh object describing how to draw parts of the mesh
 class Mesh: NSObject {
 	
 	// Constructs an array of meshes from the provided file URL, which indicate the location of a model
@@ -114,6 +158,7 @@ class Mesh: NSObject {
 	//  and material data to set in a Metal render command encoder for that draw call
 	var submeshes: [Submesh] = []
 }
+
 
 
 
