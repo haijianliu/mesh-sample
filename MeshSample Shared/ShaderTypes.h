@@ -23,27 +23,66 @@
 
 typedef NS_ENUM(NSInteger, BufferIndex)
 {
-    BufferIndexMeshPositions = 0,
-    BufferIndexMeshGenerics  = 1,
-    BufferIndexUniforms      = 2
+	BufferIndexMeshPositions = 0,
+	BufferIndexMeshGenerics  = 1,
+	BufferIndexUniforms      = 2
 };
 
 typedef NS_ENUM(NSInteger, VertexAttribute)
 {
-    VertexAttributePosition  = 0,
-    VertexAttributeTexcoord  = 1,
+	VertexAttributePosition  = 0,
+	VertexAttributeTexcoord  = 1,
 };
 
+// Texture index values shared between shader and C code to ensure Metal shader texture indices
+//   match indices of Metal API texture set calls
 typedef NS_ENUM(NSInteger, TextureIndex)
 {
-    TextureIndexColor    = 0,
+	TextureIndexBaseColor    = 0,
+	TextureIndexMetallic         = 1,
+	TextureIndexRoughness        = 2,
+	TextureIndexNormal           = 3,
+	TextureIndexAmbientOcclusion = 4,
+	TextureIndexIrradianceMap    = 5,
+	TextureIndexNumMeshTextureIndices = TextureIndexAmbientOcclusion + 1,
 };
 
 typedef struct
 {
-    matrix_float4x4 projectionMatrix;
-    matrix_float4x4 modelViewMatrix;
+	matrix_float4x4 projectionMatrix;
+	matrix_float4x4 modelViewMatrix;
 } Uniforms;
 
+typedef NS_ENUM(NSInteger, QualityLevel)
+{
+	QualityLevelHigh   = 0,
+	QualityLevelMedium = 1,
+	QualityLevelLow    = 2,
+	NumQualityLevels
+};
+
+typedef NS_ENUM(NSInteger, FunctionConstant)
+{
+	FunctionConstantBaseColorMapIndex,
+	FunctionConstantNormalMapIndex,
+	FunctionConstantMetallicMapIndex,
+	FunctionConstantRoughnessMapIndex,
+	FunctionConstantAmbientOcclusionMapIndex,
+	FunctionConstantIrradianceMapIndex
+};
+
+typedef struct
+{
+	vector_float3 baseColor;
+	vector_float3 irradiatedColor;
+	vector_float3 roughness;
+	vector_float3 metalness;
+	float         ambientOcclusion;
+	float         mapWeights[TextureIndexNumMeshTextureIndices];
+} MaterialUniforms;
+
+
 #endif /* ShaderTypes_h */
+
+
 

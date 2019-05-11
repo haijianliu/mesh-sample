@@ -24,6 +24,8 @@
 		6097AEEA22867BB9000A6867 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6097AEC222867BB9000A6867 /* Assets.xcassets */; };
 		6097AEFB22867D64000A6867 /* Models in Resources */ = {isa = PBXBuildFile; fileRef = 6097AEFA22867D63000A6867 /* Models */; };
 		6097AEFC22867D64000A6867 /* Models in Resources */ = {isa = PBXBuildFile; fileRef = 6097AEFA22867D63000A6867 /* Models */; };
+		6097AEFE22867E5D000A6867 /* Mesh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6097AEFD22867E5D000A6867 /* Mesh.swift */; };
+		6097AEFF22867E5D000A6867 /* Mesh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6097AEFD22867E5D000A6867 /* Mesh.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +45,7 @@
 		6097AEE022867BB9000A6867 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		6097AEE222867BB9000A6867 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		6097AEFA22867D63000A6867 /* Models */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Models; sourceTree = "<group>"; };
+		6097AEFD22867E5D000A6867 /* Mesh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mesh.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +84,7 @@
 				6097AEC122867BB7000A6867 /* ShaderTypes.h */,
 				6097AEBF22867BB7000A6867 /* Shaders.metal */,
 				6097AEC022867BB7000A6867 /* Renderer.swift */,
+				6097AEFD22867E5D000A6867 /* Mesh.swift */,
 			);
 			path = "MeshSample Shared";
 			sourceTree = "<group>";
@@ -226,6 +230,7 @@
 				6097AEE322867BB9000A6867 /* Shaders.metal in Sources */,
 				6097AECD22867BB9000A6867 /* GameViewController.swift in Sources */,
 				6097AECB22867BB9000A6867 /* AppDelegate.swift in Sources */,
+				6097AEFE22867E5D000A6867 /* Mesh.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -237,6 +242,7 @@
 				6097AEE422867BB9000A6867 /* Shaders.metal in Sources */,
 				6097AEDE22867BB9000A6867 /* GameViewController.swift in Sources */,
 				6097AEDC22867BB9000A6867 /* AppDelegate.swift in Sources */,
+				6097AEFF22867E5D000A6867 /* Mesh.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
