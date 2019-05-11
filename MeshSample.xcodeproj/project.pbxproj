@@ -22,6 +22,8 @@
 		6097AEE822867BB9000A6867 /* ShaderTypes.h in Resources */ = {isa = PBXBuildFile; fileRef = 6097AEC122867BB7000A6867 /* ShaderTypes.h */; };
 		6097AEE922867BB9000A6867 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6097AEC222867BB9000A6867 /* Assets.xcassets */; };
 		6097AEEA22867BB9000A6867 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6097AEC222867BB9000A6867 /* Assets.xcassets */; };
+		6097AEFB22867D64000A6867 /* Models in Resources */ = {isa = PBXBuildFile; fileRef = 6097AEFA22867D63000A6867 /* Models */; };
+		6097AEFC22867D64000A6867 /* Models in Resources */ = {isa = PBXBuildFile; fileRef = 6097AEFA22867D63000A6867 /* Models */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +42,7 @@
 		6097AEDD22867BB9000A6867 /* GameViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewController.swift; sourceTree = "<group>"; };
 		6097AEE022867BB9000A6867 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		6097AEE222867BB9000A6867 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		6097AEFA22867D63000A6867 /* Models */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Models; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,10 +76,11 @@
 		6097AEBE22867BB7000A6867 /* MeshSample Shared */ = {
 			isa = PBXGroup;
 			children = (
+				6097AEC222867BB9000A6867 /* Assets.xcassets */,
+				6097AEFA22867D63000A6867 /* Models */,
 				6097AEC122867BB7000A6867 /* ShaderTypes.h */,
 				6097AEBF22867BB7000A6867 /* Shaders.metal */,
 				6097AEC022867BB7000A6867 /* Renderer.swift */,
-				6097AEC222867BB9000A6867 /* Assets.xcassets */,
 			);
 			path = "MeshSample Shared";
 			sourceTree = "<group>";
@@ -192,6 +196,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6097AEFB22867D64000A6867 /* Models in Resources */,
 				6097AEE722867BB9000A6867 /* ShaderTypes.h in Resources */,
 				6097AED022867BB9000A6867 /* Main.storyboard in Resources */,
 				6097AEE922867BB9000A6867 /* Assets.xcassets in Resources */,
@@ -205,6 +210,7 @@
 			files = (
 				6097AEE122867BB9000A6867 /* Main.storyboard in Resources */,
 				6097AEEA22867BB9000A6867 /* Assets.xcassets in Resources */,
+				6097AEFC22867D64000A6867 /* Models in Resources */,
 				6097AEE822867BB9000A6867 /* ShaderTypes.h in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
