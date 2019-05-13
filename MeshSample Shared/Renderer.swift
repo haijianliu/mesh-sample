@@ -15,6 +15,7 @@ import simd
 // The 256 byte aligned size of our uniform structure
 let alignedUniformsSize = (MemoryLayout<Uniforms>.size & ~0xFF) + 0x100
 
+// The max number of command buffers in flight
 let maxBuffersInFlight = 3
 
 enum RendererError: Error {
@@ -95,32 +96,43 @@ class Renderer: NSObject, MTKViewDelegate {
 			return nil
 		}
 		
+		// Create a Model I/O vertexDescriptor so that we format/layout our Model I/O mesh vertices to fit our Metal render pipeline's vertex descriptor layout
 		let modelIOVertexDescriptor = MTKModelIOVertexDescriptorFromMetal(mtlVertexDescriptor)
 		guard let attributes = modelIOVertexDescriptor.attributes as? [MDLVertexAttribute] else { return nil }
+		
+		// Indicate how each Metal vertex descriptor attribute maps to each ModelIO  attribute
 		attributes[VertexAttribute.position.rawValue].name = MDLVertexAttributePosition
 		attributes[VertexAttribute.texcoord.rawValue].name = MDLVertexAttributeTextureCoordinate
 		attributes[VertexAttribute.normal.rawValue].name = MDLVertexAttributeNormal
 		attributes[VertexAttribute.tangent.rawValue].name = MDLVertexAttributeTangent
 		attributes[VertexAttribute.bitangent.rawValue].name = MDLVertexAttributeBitangent
 		
+		// Uses Model I/O to load a model file at the given URL
 		let modelFileURL = Bundle.main.url(forResource: "Models/firetruck", withExtension: "obj")
+		// Create a MetalKit mesh buffer allocator so that Model I/O  will load mesh data directly into Metal buffers accessible by the GPU
 		let bufferAllocator = MTKMeshBufferAllocator(device: device)
+		// Use Model I/O to load the model file at the URL.
+		// This returns a Model I/O asset object, which contains a hierarchy of Model I/O objects composing a "scene" described by the model file.
+		// This hierarchy may include lights, cameras, but, most importantly, mesh and submesh data that we'll render with Metal
 		let asset = MDLAsset(url: modelFileURL, vertexDescriptor: nil, bufferAllocator: bufferAllocator)
 		
+		// Traverse the Model I/O asset hierarchy to find Model I/O meshes and create Metal vertex buffers, index buffers, and textures from them
 		for object in asset.childObjects(of: MDLMesh.self) {
-			if let mesh = object as? MDLMesh {
-				mesh.vertexDescriptor = modelIOVertexDescriptor
+			// If this Model I/O  object is a mesh object (not a camera, light, or something else)...
+			if let modelIOMesh = object as? MDLMesh {
+				// Apply the Model I/O vertex descriptor we created to match the Metal vertex descriptor.
+				// Assigning a new vertex descriptor to a Model I/O mesh performs a re-layout of the vertex data. In this case we created the Model I/O vertex descriptor so that the layout of the vertices in the Model I/O mesh match the layout of vertices our Metal render pipeline expects as input into its vertex shader
+				// Note that we can only perform this re-layout operation after we have created tangents and bitangents. This is because Model I/O's addTangentBasis methods only work with vertex data is all in 32-bit floating-point. The vertex descriptor we're applying changes some 32-bit floats into 16-bit floats or other types from which Model I/O cannot produce tangents
+				modelIOMesh.vertexDescriptor = modelIOVertexDescriptor
 
+				// Create the metalKit mesh which will contain the Metal buffer(s) with the mesh's vertex data and submeshes with info to draw the mesh
 				var metalKitMesh: MTKMesh
-
-				do {
-					metalKitMesh = try MTKMesh(mesh: mesh, device: device)
-				} catch {
-					print("Unable to build MetalKit Mesh. Error info: \(error)")
-					return nil
-				}
-				
+				do { metalKitMesh = try MTKMesh(mesh: modelIOMesh, device: device) }
+				catch { print("Unable to build MetalKit Mesh. Error info: \(error)"); return nil }
 				meshes.append(metalKitMesh)
+				
+				// There should always be the same number of MetalKit submeshes in the MetalKit mesh as there are Model I/O submeshes in the Model I/O mesh
+				assert(metalKitMesh.submeshes.count == modelIOMesh.submeshes!.count);
 			}
 		}
 		
